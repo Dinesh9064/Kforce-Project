@@ -1,0 +1,66 @@
+ # Local setup of az #
+
+az login --use-device-code
+
+az account list --output table
+Name                  CloudName    SubscriptionId                        TenantId                              State    IsDefault
+--------------------  -----------  ------------------------------------  ------------------------------------  -------  -----------
+Pay-As-You-Go         AzureCloud   afb83aec-086a-4b68-8b06-7d8e209d0090  7bbf9c18-bb55-4476-84df-248c2fe278d6  Enabled  False
+Azure subscription 1  AzureCloud   b8594d65-aed4-4c08-96fb-259a5360b8a4  223c4572-9097-45b5-a678-44cfee49b115  Enabled  True
+
+
+az account set --subscription "b8594d65-aed4-4c08-96fb-259a5360b8a4"
+
+az account show
+
+ Output:
+{
+  "environmentName": "AzureCloud",
+  "homeTenantId": "223c4572-9097-45b5-a678-44cfee49b115",
+  "id": "b8594d65-aed4-4c08-96fb-259a5360b8a4",
+  "isDefault": true,
+  "managedByTenants": [],
+  "name": "Azure subscription 1",
+  "state": "Enabled",
+  "tenantId": "223c4572-9097-45b5-a678-44cfee49b115",
+  "user": {
+    "name": "dinesh.kumar.0809@outlook.com",
+    "type": "user"
+  }
+}
+
+#############  Use Below command to setup backend for statefile ########
+
+# Azure CLI Commands to Set Up Backend Resources
+export RG_NAME="terraform-state-rg"
+export LOCATION="westeurope"
+export STORAGE_ACCOUNT="tfstate$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 8)"
+export CONTAINER_NAME="tfstate"
+
+
+az group create --name $RG_NAME --location $LOCATION
+
+az storage account create \
+  --name $STORAGE_ACCOUNT \
+  --resource-group $RG_NAME \
+  --location $LOCATION \
+  --sku Standard_LRS \
+  --kind StorageV2 \
+  --https-only true
+
+
+az storage container create \
+  --name $CONTAINER_NAME \
+  --account-name $STORAGE_ACCOUNT \
+  --auth-mode login
+
+
+cat > backend.conf <<EOF
+resource_group_name  = "$RG_NAME"
+storage_account_name = "$STORAGE_ACCOUNT"
+container_name       = "$CONTAINER_NAME"
+key                  = "milestone1.tfstate"
+EOF
+
+
+terraform init -backend-config=backend.conf -reconfigure
